@@ -1,128 +1,86 @@
-import "./styles.css";
+import { useMemo, useState } from "react";
+import { StoreProvider, useStore } from "./store/store";
+import BoardPage from "./ui/BoardPage";
+import BatchesPage from "./ui/BatchesPage";
+import GapsPage from "./ui/GapsPage";
+import RisksPage from "./ui/RisksPage";
+import RulesPage from "./ui/RulesPage";
+import HistoryPage from "./ui/HistoryPage";
+import { risks } from "./domain/engine";
 
-const project = {
-  "sourceNo": 7,
-  "id": "hxyfront-62012",
-  "port": 62012,
-  "title": "纺织染整小样管理",
-  "domain": "纺织染整",
-  "prompt": "我需要一个纺织染整实验室的小样管理前端系统，可以记录面料成分、克重、染料配方、浴比、温度曲线、保温时间、后整理方式、色差值和评审结果。页面需要有小样批次列表、配方比例展示、Lab色差对比、工艺曲线摘要和按客户订单筛选。",
-  "palette": [
-    "#be123c",
-    "#4f46e5",
-    "#16a34a"
-  ],
-  "metrics": [
-    "小样批次",
-    "色差超限",
-    "客户订单",
-    "通过率"
-  ],
-  "filters": [
-    "棉",
-    "涤纶",
-    "锦纶",
-    "混纺"
-  ],
-  "fields": [
-    "面料成分",
-    "克重",
-    "染料配方",
-    "浴比",
-    "保温时间",
-    "色差值"
-  ],
-  "records": [
-    [
-      "LAB-620A",
-      "棉府绸120g",
-      "ΔE 0.84",
-      "评审通过"
-    ],
-    [
-      "LAB-621C",
-      "涤纶针织",
-      "升温曲线偏快",
-      "待复染"
-    ],
-    [
-      "LAB-624B",
-      "混纺斜纹",
-      "后整理柔软剂2%",
-      "客户确认中"
-    ]
-  ]
-};
+type Tab = "board" | "batches" | "gaps" | "risks" | "rules" | "history";
 
-function App() {
+const TABS: { id: Tab; label: string }[] = [
+  { id: "board", label: "预约白板" },
+  { id: "batches", label: "批次档案" },
+  { id: "gaps", label: "空档" },
+  { id: "risks", label: "交期风险" },
+  { id: "rules", label: "排程规则" },
+  { id: "history", label: "调整历史" },
+];
+
+function Shell() {
+  const store = useStore();
+  const [tab, setTab] = useState<Tab>("board");
+
+  const counts = useMemo(() => {
+    const c = { pending: 0, review: 0, riskDanger: 0 };
+    for (const b of store.state.batches) {
+      if (b.status === "pending") c.pending += 1;
+      if (b.status === "review") c.review += 1;
+    }
+    c.riskDanger = risks(store.state, store.now.toISOString()).filter(
+      (r) => r.level === "danger"
+    ).length;
+    return c;
+  }, [store.state, store.now]);
+
+  const badge = (id: Tab): number | null => {
+    if (id === "batches") return counts.pending || null;
+    if (id === "board") return counts.review || null;
+    if (id === "risks") return counts.riskDanger || null;
+    return null;
+  };
+
   return (
-    <main className="app">
-      <section className="hero">
-        <p>{project.id} · 源提示词{project.sourceNo} · Port {project.port}</p>
-        <h1>{project.title}</h1>
-        <span>{project.prompt}</span>
-      </section>
-
-      <section className="metrics">
-        {project.metrics.map((metric: string, index: number) => (
-          <article key={metric}>
-            <small>{metric}</small>
-            <strong>{[28, 6, 14, 91][index] ?? 10}</strong>
-          </article>
-        ))}
-      </section>
-
-      <section className="workspace">
-        <aside className="panel">
-          <h2>{project.domain}分类</h2>
-          <div className="chips">
-            {project.filters.map((item: string) => (
-              <button key={item}>{item}</button>
-            ))}
-          </div>
-        </aside>
-
-        <section className="panel form-panel">
-          <div className="heading">
-            <div>
-              <p>专业字段</p>
-              <h2>新增记录</h2>
-            </div>
-            <button className="primary">保存记录</button>
-          </div>
-          <div className="field-grid">
-            {project.fields.map((field: string) => (
-              <label key={field}>
-                <span>{field}</span>
-                <input placeholder={"填写" + field} />
-              </label>
-            ))}
-          </div>
-        </section>
-      </section>
-
-      <section className="panel">
-        <div className="heading">
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark">染</span>
           <div>
-            <p>近期记录</p>
-            <h2>工作台摘要</h2>
+            <h1>打样染缸预约台</h1>
+            <small>排期不再靠白板 · 按染缸占位 · 冲突自动拦截</small>
           </div>
-          <button>导出CSV</button>
         </div>
-        <div className="records">
-          {project.records.map((record: string[], index: number) => (
-            <article key={record.join("-")}>
-              <b>{String(index + 1).padStart(2, "0")}</b>
-              <div>
-                <h3>{record[0]}</h3>
-                <p>{record.slice(1).join(" · ")}</p>
-              </div>
-            </article>
+        <nav className="tabs">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              className={`tab ${tab === t.id ? "tab-on" : ""}`}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+              {badge(t.id) && <span className="tab-badge">{badge(t.id)}</span>}
+            </button>
           ))}
-        </div>
-      </section>
-    </main>
+        </nav>
+      </header>
+      <main className="content">
+        {tab === "board" && <BoardPage />}
+        {tab === "batches" && <BatchesPage />}
+        {tab === "gaps" && <GapsPage />}
+        {tab === "risks" && <RisksPage />}
+        {tab === "rules" && <RulesPage />}
+        {tab === "history" && <HistoryPage />}
+      </main>
+    </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <StoreProvider>
+      <Shell />
+    </StoreProvider>
+  );
+}
