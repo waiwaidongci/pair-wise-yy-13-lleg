@@ -1,128 +1,127 @@
-import "./styles.css";
+import { useState } from 'react';
+import {
+  ReservationProvider,
+  useReservation,
+} from './state/ReservationContext';
+import { SchedulePage } from './pages/SchedulePage';
+import { BatchesPage } from './pages/BatchesPage';
+import { GapsPage } from './pages/GapsPage';
+import { HistoryPage } from './pages/HistoryPage';
+import { RulesPage } from './pages/RulesPage';
+import { BatchFormModal } from './components/BatchFormModal';
+import { BatchDetailModal } from './components/BatchDetailModal';
+import { PlaceModal } from './components/PlaceModal';
+import type { Batch } from './domain/types';
 
-const project = {
-  "sourceNo": 7,
-  "id": "hxyfront-62012",
-  "port": 62012,
-  "title": "纺织染整小样管理",
-  "domain": "纺织染整",
-  "prompt": "我需要一个纺织染整实验室的小样管理前端系统，可以记录面料成分、克重、染料配方、浴比、温度曲线、保温时间、后整理方式、色差值和评审结果。页面需要有小样批次列表、配方比例展示、Lab色差对比、工艺曲线摘要和按客户订单筛选。",
-  "palette": [
-    "#be123c",
-    "#4f46e5",
-    "#16a34a"
-  ],
-  "metrics": [
-    "小样批次",
-    "色差超限",
-    "客户订单",
-    "通过率"
-  ],
-  "filters": [
-    "棉",
-    "涤纶",
-    "锦纶",
-    "混纺"
-  ],
-  "fields": [
-    "面料成分",
-    "克重",
-    "染料配方",
-    "浴比",
-    "保温时间",
-    "色差值"
-  ],
-  "records": [
-    [
-      "LAB-620A",
-      "棉府绸120g",
-      "ΔE 0.84",
-      "评审通过"
-    ],
-    [
-      "LAB-621C",
-      "涤纶针织",
-      "升温曲线偏快",
-      "待复染"
-    ],
-    [
-      "LAB-624B",
-      "混纺斜纹",
-      "后整理柔软剂2%",
-      "客户确认中"
-    ]
-  ]
-};
+type Tab = 'board' | 'gaps' | 'batches' | 'history' | 'rules';
 
-function App() {
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'board', label: '排程看板' },
+  { key: 'gaps', label: '染缸空档' },
+  { key: 'batches', label: '批次档案' },
+  { key: 'history', label: '调整历史' },
+  { key: 'rules', label: '排程规则' },
+];
+
+function Shell() {
+  const { notice, dispatch, operator, setOperator, batches } = useReservation();
+  const [tab, setTab] = useState<Tab>('board');
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Batch | null>(null);
+  const [detail, setDetail] = useState<Batch | null>(null);
+  const [placing, setPlacing] = useState<Batch | null>(null);
+
+  // 详情/占位对象始终取最新档案（排期变化后弹窗同步）
+  const liveDetail = detail ? batches.find((b) => b.id === detail.id) ?? null : null;
+  const livePlacing = placing ? batches.find((b) => b.id === placing.id) ?? null : null;
+
+  const openNew = () => {
+    setEditing(null);
+    setFormOpen(true);
+  };
+  const openEdit = (b: Batch) => {
+    setDetail(null);
+    setEditing(b);
+    setFormOpen(true);
+  };
+  const openBatchById = (id: string) => {
+    const b = batches.find((x) => x.id === id);
+    if (b) setDetail(b);
+  };
+
   return (
-    <main className="app">
-      <section className="hero">
-        <p>{project.id} · 源提示词{project.sourceNo} · Port {project.port}</p>
-        <h1>{project.title}</h1>
-        <span>{project.prompt}</span>
-      </section>
-
-      <section className="metrics">
-        {project.metrics.map((metric: string, index: number) => (
-          <article key={metric}>
-            <small>{metric}</small>
-            <strong>{[28, 6, 14, 91][index] ?? 10}</strong>
-          </article>
-        ))}
-      </section>
-
-      <section className="workspace">
-        <aside className="panel">
-          <h2>{project.domain}分类</h2>
-          <div className="chips">
-            {project.filters.map((item: string) => (
-              <button key={item}>{item}</button>
-            ))}
-          </div>
-        </aside>
-
-        <section className="panel form-panel">
-          <div className="heading">
-            <div>
-              <p>专业字段</p>
-              <h2>新增记录</h2>
-            </div>
-            <button className="primary">保存记录</button>
-          </div>
-          <div className="field-grid">
-            {project.fields.map((field: string) => (
-              <label key={field}>
-                <span>{field}</span>
-                <input placeholder={"填写" + field} />
-              </label>
-            ))}
-          </div>
-        </section>
-      </section>
-
-      <section className="panel">
-        <div className="heading">
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="brand">
+          <span className="brand-mark">染</span>
           <div>
-            <p>近期记录</p>
-            <h2>工作台摘要</h2>
+            <h1>染缸预约台</h1>
+            <small>打样排期 · 占位冲突自动校验 · 加急提前 · 变更留痕</small>
           </div>
-          <button>导出CSV</button>
         </div>
-        <div className="records">
-          {project.records.map((record: string[], index: number) => (
-            <article key={record.join("-")}>
-              <b>{String(index + 1).padStart(2, "0")}</b>
-              <div>
-                <h3>{record[0]}</h3>
-                <p>{record.slice(1).join(" · ")}</p>
-              </div>
-            </article>
-          ))}
+        <div className="header-right">
+          <label className="operator">
+            当前操作人
+            <input value={operator} onChange={(e) => setOperator(e.target.value)} />
+          </label>
+          <button
+            className="ghost"
+            onClick={() => {
+              if (confirm('恢复为内置演示数据？当前修改将被覆盖。')) dispatch({ type: 'resetDemo' });
+            }}
+          >
+            重置演示
+          </button>
         </div>
-      </section>
-    </main>
+      </header>
+
+      <nav className="app-nav">
+        {TABS.map((t) => (
+          <button key={t.key} className={tab === t.key ? 'nav-btn on' : 'nav-btn'} onClick={() => setTab(t.key)}>
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      <main className="app-main">
+        {tab === 'board' && <SchedulePage onOpenBatch={(b) => setDetail(b)} />}
+        {tab === 'batches' && <BatchesPage onOpenBatch={(b) => setDetail(b)} onNew={openNew} />}
+        {tab === 'gaps' && <GapsPage />}
+        {tab === 'history' && <HistoryPage onOpenBatch={openBatchById} />}
+        {tab === 'rules' && <RulesPage />}
+      </main>
+
+      <footer className="app-foot">
+        排程规则（纯函数引擎）· 批次档案（localStorage）· 页面（React）三层各自维护，互不耦合
+      </footer>
+
+      {formOpen && <BatchFormModal open={formOpen} editing={editing} onClose={() => setFormOpen(false)} />}
+      {liveDetail && !formOpen && (
+        <BatchDetailModal
+          batch={liveDetail}
+          onClose={() => setDetail(null)}
+          onEdit={openEdit}
+          onPlace={(b) => {
+            setDetail(null);
+            setPlacing(b);
+          }}
+        />
+      )}
+      {livePlacing && <PlaceModal batch={livePlacing} onClose={() => setPlacing(null)} />}
+
+      {notice && (
+        <div className={`toast toast-${notice.level}`} onClick={() => dispatch({ type: 'clearNotice' })}>
+          {notice.text}
+        </div>
+      )}
+    </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <ReservationProvider>
+      <Shell />
+    </ReservationProvider>
+  );
+}
